@@ -24,10 +24,24 @@ Valery Ortegon-Gerencia/Documentación-
 3. Ejecutar `sql/01_script_maestro.sql`.
 4. Ejecutar `sql/02_tablas_extra.sql`.
 5. Ejecutar `sql/03_vistas.sql`.
-
-## Cómo ejecutar el backend
+   
+## Funcionalidades
+Consulta por país.
+Consulta por año.
+Comparación Colombia, Ecuador y Paraguay.
+Gráficas de crédito agropecuario.
+Diagnóstico automático de brecha.
+Recomendaciones por país.
+Descarga de datos filtrados.
+## Cómo ejecutar el backend y frontend
 
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
+
+
+```bash
+cd frontend
+pip install -r requirements.txt
+streamlit run app.py  
