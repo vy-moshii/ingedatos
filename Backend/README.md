@@ -33,7 +33,8 @@ agroc/
 cd agroc
 
 # 2. Crear entorno virtual e instalar dependencias
-python -m venv venv
+# Si no tienes Python 3.12 instalado: sudo apt install python3.12 python3.12-venv
+python3.12 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
