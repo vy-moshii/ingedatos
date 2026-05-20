@@ -1,2 +1,2 @@
-MONGODB_URL=mongodb://localhost:27017
+MONGODB_URL=mongodb+srv://Jacobo:ingenieriadedatos@cluster1.gtyocag.mongodb.net/?appName=Cluster1
 DB_NAME=sentinel_bank
