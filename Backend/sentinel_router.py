@@ -10,8 +10,8 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.db.session import get_db
-from app.schemas.schemas import (
+from sentinel_session import get_db
+from sentinel_schemas import (
     ClienteOut,
     TransaccionOut,
     AlertaOut,
@@ -19,7 +19,7 @@ from app.schemas.schemas import (
     MensajeOut,
     DeteccionOut,
 )
-from app.services import sentinel as svc
+import sentinel_services as svc
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

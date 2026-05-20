@@ -1,5 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from app.core.config import settings
+from sentinel_config import settings
 
 # Singleton del cliente — se inicializa en el lifespan de FastAPI
 _client: AsyncIOMotorClient | None = None

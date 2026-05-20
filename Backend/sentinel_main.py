@@ -8,13 +8,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import DuplicateKeyError, OperationFailure
 
-from app.core.errors import (
+from sentinel_errors import (
     duplicate_key_handler,
     operation_failure_handler,
     generic_error_handler,
 )
-from app.db.session import init_client, close_client, check_connection
-from app.routers.sentinel import router
+from sentinel_session import init_client, close_client, check_connection
+from sentinel_router import router
 
 
 # ---------------------------------------------------------------------------

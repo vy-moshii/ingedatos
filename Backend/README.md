@@ -64,10 +64,10 @@ sentinel/
 git clone <repo>
 cd sentinel
 
-python -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install -r sentinel_requirements.txt
 ```
 
 ### 2. Variables de entorno
@@ -108,7 +108,7 @@ mongod --replSet rs0 --dbpath /data/db
 ### 4. Levantar el servidor
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn sentinel_main:app --reload
 ```
 
 El servidor queda disponible en `http://localhost:8000`.
