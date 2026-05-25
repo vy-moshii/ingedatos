@@ -15,13 +15,13 @@ class PaisOut(PaisBase):
 class CarteraAnualOut(BaseModel):
     pais_id: str
     anio: int
-    tipo_productor: Optional[str]
-    n_operaciones: Optional[int]
-    valor_miles_usd: Optional[float]
-    moneda_original: Optional[str]
-    tasa_cambio: Optional[float]
-    fuente: Optional[str]
-    notas: Optional[str]
+    tipo_productor: Optional[str] = None
+    n_operaciones: Optional[int] = None
+    valor_miles_usd: Optional[float] = None
+    moneda_original: Optional[str] = None
+    tasa_cambio: Optional[float] = None
+    fuente: Optional[str] = None
+    notas: Optional[str] = None
 
 # Esquema para /oferta (con nombre de país)
 class OfertaResponse(BaseModel):
@@ -115,6 +115,16 @@ class MissingDataResponse(BaseModel):
     dato_faltante: str
     prioridad: str
     por_que_importa: str
+
+class RecomendacionesResponse(BaseModel):
+    pais: str
+    pais_id: str
+    anio: int
+    nivel_brecha: Optional[str] = None
+    eje: Optional[str] = None
+    recomendacion: Optional[str] = None
+    accion: Optional[str] = None
+    indicador_relacionado: Optional[str] = None
 
 # Esquema para /fuentes
 class FuenteResponse(BaseModel):

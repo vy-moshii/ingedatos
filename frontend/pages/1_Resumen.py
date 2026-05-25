@@ -1,8 +1,9 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import get_findex, get_kpis, get_conceptos_clave, get_guia_lectura_graficas, descargar_csv, PAISES
+from data_client import get_findex, get_kpis, get_conceptos_clave, get_guia_lectura_graficas, descargar_csv, PAISES, set_page_style
 
 st.set_page_config(page_title="Resumen general", page_icon="📌", layout="wide")
+set_page_style("Resumen")
 
 st.title("Resumen general")
 st.write("Esta pantalla resume el argumento de la investigación: los países pueden tener conectividad, cuentas y pagos digitales, pero eso no significa que la población rural acceda a crédito productivo formal.")

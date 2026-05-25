@@ -1,8 +1,9 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import get_oferta, get_tipo_credito, get_findex, get_rural_urban, diagnosticar_pais, get_conceptos_clave, get_relaciones_tablas, descargar_csv
+from data_client import get_oferta, get_tipo_credito, get_findex, get_rural_urban, diagnosticar_pais, get_conceptos_clave, get_relaciones_tablas, descargar_csv, set_page_style
 
 st.set_page_config(page_title="Colombia", page_icon="🇨🇴", layout="wide")
+set_page_style("Colombia")
 
 st.title("Colombia")
 st.write("Colombia permite ver el desacople entre crecimiento absoluto de la oferta FINAGRO y baja participación relativa del pequeño productor frente al gran productor.")

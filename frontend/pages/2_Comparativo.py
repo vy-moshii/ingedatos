@@ -1,8 +1,9 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import get_findex, segmento_menor_escala, get_oferta, get_rural_urban, get_conceptos_clave, get_relaciones_tablas, descargar_csv, PAISES
+from data_client import get_findex, segmento_menor_escala, get_oferta, get_rural_urban, get_conceptos_clave, get_relaciones_tablas, descargar_csv, PAISES, set_page_style
 
 st.set_page_config(page_title="Comparativo", page_icon="🌎", layout="wide")
+set_page_style("Comparativo")
 
 st.title("Comparativo entre países")
 st.write("Esta pantalla une demanda y oferta. Findex explica lo que reportan las personas; las fuentes institucionales explican cómo se comporta la oferta oficial de crédito agropecuario.")
