@@ -36,12 +36,13 @@ Descarga de datos filtrados.
 ## Cómo ejecutar el backend y frontend
 
 ```bash
-cd backend
+cd Backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-
+```
 
 ```bash
 cd frontend
 pip install -r requirements.txt
-streamlit run app.py  
+streamlit run app.py
+```
