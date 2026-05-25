@@ -1,8 +1,9 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import diagnosticos, diagnosticar_pais, get_recomendaciones, get_missing_data, get_findex, get_conceptos_clave, get_relaciones_tablas, descargar_csv, PAISES
+from data_client import diagnosticos, diagnosticar_pais, get_recomendaciones, get_missing_data, get_findex, get_conceptos_clave, get_relaciones_tablas, descargar_csv, PAISES, set_page_style
 
 st.set_page_config(page_title="Diagnóstico automático", page_icon="🧭", layout="wide")
+set_page_style("Diagnostico")
 
 st.title("Diagnóstico automático de brecha")
 st.write("El diagnóstico traduce muchos indicadores en una lectura sencilla: qué tan grave es la distancia entre inclusión financiera transaccional y acceso a crédito productivo formal.")
@@ -13,7 +14,6 @@ with st.sidebar:
 
 resultado = diagnosticar_pais(pais)
 
-st.info("El diagnóstico cruza cuatro señales: brecha cuenta digital-crédito formal, cambio del crédito formal, peso de la subsistencia y pagos agrícolas en efectivo. En una versión conectada a PostgreSQL, este cálculo debería vivir en una función SQL y actualizarse con trigger cuando cambien los indicadores.")
 
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Nivel", resultado["nivel"])
@@ -44,7 +44,7 @@ st.caption("El puntaje no pretende reemplazar el análisis académico. Sirve par
 st.subheader("Cómo se construye la lectura")
 findex = get_findex()
 base = findex[(findex["pais"] == pais) & (findex["anio"] == 2024)][["pais", "anio", "cuenta_digital", "prestamo_banco_formal", "prestamo_negocio", "credito_subsistencia", "ratio_subsistencia_productivo", "pagos_agricolas_total", "pagos_agricolas_efectivo", "efectivo_agricola_pct"]]
-st.write("Esta tabla muestra los campos mínimos que alimentan el diagnóstico. En PostgreSQL, estos datos deberían salir de `indicadores_findex` y el resultado debería guardarse en `diagnostico_brecha`.")
+st.write("Esta tabla muestra los campos mínimos que alimentan el diagnóstico. En PostgreSQL, estos datos se obtienen desde `indicadores_findex` y el resultado se guarda en `diagnostico_brecha`.")
 st.dataframe(base, use_container_width=True)
 
 with st.expander("Relación de tablas para el diagnóstico"):

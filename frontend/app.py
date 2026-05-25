@@ -1,14 +1,46 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import get_narrativa, get_findex, get_kpis, diagnosticos, get_sources, get_conceptos_clave, get_flujo_analitico, descargar_csv, PAISES
+from data_client import get_narrativa, get_findex, get_kpis, diagnosticos, get_sources, get_conceptos_clave, get_flujo_analitico, descargar_csv, PAISES, set_page_style
 
 st.set_page_config(page_title="AgroCredit Insight", page_icon="🌱", layout="wide")
+set_page_style("Home")
 
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-  background: #0f1724;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at top center, rgba(255,248,208,0.18), transparent 18%),
+              linear-gradient(180deg, #0b1f12 0%, #123523 35%, #1b5a30 60%, #133b21 100%);
   color: white;
+}
+[data-testid="stAppViewContainer"]::before {
+  content: "";
+  position: absolute;
+  top: -22%;
+  left: 50%;
+  width: 180%;
+  height: 130%;
+  background: radial-gradient(circle at 50% 50%, rgba(255,244,174,0.36), transparent 32%);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+[data-testid="stAppViewContainer"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(115deg, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 1px, transparent 1px, transparent 42px);
+  opacity: 0.18;
+  animation: field-move 18s linear infinite;
+  z-index: 0;
+}
+@keyframes field-move {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-80px); }
+}
+[data-testid="stAppViewContainer"] > div {
+  position: relative;
+  z-index: 1;
 }
 [data-testid="stAppViewContainer"] * {
   color: white !important;
@@ -26,63 +58,97 @@ st.markdown("""
 }
 .block-container {padding-top: 2rem;}
 .hero {
-  padding: 2rem;
-  border-radius: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: linear-gradient(135deg, #143d2a 0%, #2e7d4f 55%, #9cc86a 100%);
+  position: relative;
+  padding: 2.5rem;
+  border-radius: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(18, 43, 26, 0.95), rgba(16, 39, 31, 1));
+  backdrop-filter: blur(8px);
   color: white;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.6rem;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
 }
-.hero h1 {font-size: 3rem; margin-bottom: .2rem;}
-.hero p {font-size: 1.12rem; max-width: 980px;}
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(255, 242, 181, 0.14), transparent 18%),
+              radial-gradient(circle at 75% 15%, rgba(255, 214, 116, 0.11), transparent 16%),
+              linear-gradient(180deg, rgba(255, 235, 180, 0.04), transparent 28%, transparent 100%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  left: -10%;
+  bottom: 0;
+  width: 120%;
+  height: 90%;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 241, 189, 0.1), transparent 24%),
+              linear-gradient(100deg, rgba(85, 140, 72, 0.68) 0%, rgba(109, 150, 96, 0.68) 42%, rgba(146, 117, 53, 0.14) 100%);
+  mask-image: radial-gradient(circle at 50% 30%, rgba(0,0,0,1) 25%, rgba(0,0,0,0) 62%);
+  opacity: 0.7;
+  filter: blur(1px);
+  pointer-events: none;
+}
+.hero h1 {font-size: 3rem; margin-bottom: .4rem; text-transform: uppercase; letter-spacing: 0.03em; text-shadow: 0 2px 10px rgba(0,0,0,0.35);}
+.hero p {font-size: 1.14rem; max-width: 900px; line-height: 1.75;}
 .section-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 1.2rem;
+  padding: 0.72rem 1.3rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, #143d2a 0%, #2e7d4f 55%, #9cc86a 100%);
-  color: white;
-  font-size: 1.1rem;
+  background: linear-gradient(135deg, #89622c 0%, #cb9b5f 100%);
+  color: #111111;
+  font-size: 1.05rem;
   font-weight: 700;
   margin-bottom: 1rem;
-  box-shadow: 0 10px 25px rgba(17, 67, 41, 0.08);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
 }
 .card {
-  background: linear-gradient(135deg, #143d2a 0%, #2e7d4f 55%, #9cc86a 100%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(145deg, #3b4c33 0%, #5c6f45 48%, #b69d6c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   padding: 1.15rem;
   border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(17, 67, 41, 0.06);
+  box-shadow: 0 8px 22px rgba(11, 30, 15, 0.14);
   min-height: 170px;
   color: white;
 }
 .card h3,
 .card p {
   color: white;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
 }
 .badge {
   display: inline-block;
   padding: .35rem .7rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  color: white;
+  background: rgba(255, 244, 205, 0.14);
+  color: #f4f1e7;
   font-weight: 700;
   margin-bottom: .5rem;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 </style>
 """, unsafe_allow_html=True)
 
 narrativa = get_narrativa()
+if not isinstance(narrativa, dict):
+    narrativa = narrativa.iloc[0].to_dict() if len(narrativa) > 0 else {}
+
+titulo = narrativa.get("titulo", "AgroCredit Insight")
+subtitulo = narrativa.get("subtitulo", "Análisis de brechas de crédito y digitalización")
+tesis = narrativa.get("tesis", "Exploramos cómo la inclusión financiera digital no siempre se traduce en acceso a crédito productivo.")
 
 st.markdown(f"""
 <div class="hero">
   <div class="badge">Dashboard de investigación aplicada</div>
   <h1>AgroCredit Insight</h1>
-  <p><b>{narrativa['titulo']}:</b> {narrativa['subtitulo']}</p>
-  <p>{narrativa['tesis']}</p>
+  <p><b>{titulo}:</b> {subtitulo}</p>
+  <p>{tesis}</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -174,5 +240,3 @@ st.subheader("Fuentes que sostienen la lectura")
 st.write("El dashboard cruza dos familias de datos: Findex describe la demanda, es decir, lo que reportan las personas; las fuentes institucionales describen la oferta, es decir, el crédito que registran entidades como FINAGRO, BCE, SEPS y BCP.")
 sources = get_sources()
 st.dataframe(sources, use_container_width=True)
-
-st.info("Cuando tus compañeros tengan API o PostgreSQL, este frontend puede cambiar de datos simulados a datos reales usando variables de entorno sin rediseñar las pantallas.")

@@ -1,8 +1,9 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import get_oferta, get_tipo_credito, get_findex, get_rural_urban, diagnosticar_pais, get_conceptos_clave, get_relaciones_tablas, descargar_csv
+from data_client import get_oferta, get_tipo_credito, get_findex, get_rural_urban, diagnosticar_pais, get_conceptos_clave, get_relaciones_tablas, descargar_csv, set_page_style
 
 st.set_page_config(page_title="Ecuador", page_icon="🇪🇨", layout="wide")
+set_page_style("Ecuador")
 
 st.title("Ecuador")
 st.write("Ecuador permite analizar una tensión importante: existe un sistema financiero amplio, pero el crédito productivo aparece muy concentrado en la banca privada y el microcrédito cae después de 2022.")

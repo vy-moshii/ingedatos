@@ -1,8 +1,9 @@
 import streamlit as st
 import plotly.express as px
-from data_mock import get_oferta, get_findex, get_rural_urban, diagnosticar_pais, get_missing_data, get_conceptos_clave, get_relaciones_tablas, descargar_csv
+from data_client import get_oferta, get_findex, get_rural_urban, diagnosticar_pais, get_missing_data, get_conceptos_clave, get_relaciones_tablas, descargar_csv, set_page_style
 
 st.set_page_config(page_title="Paraguay", page_icon="🇵🇾", layout="wide")
+set_page_style("Paraguay")
 
 st.title("Paraguay")
 st.write("Paraguay es el caso contrastante: el crédito formal crece en Findex, pero falta incorporar datos estructurados del CAH para confirmar la explicación desde la oferta institucional.")

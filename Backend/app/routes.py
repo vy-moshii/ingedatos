@@ -24,12 +24,34 @@ def get_cartera(pais_id: str, anio: Optional[int] = None, db: Session = Depends(
         q = q.filter(models.CarteraAnual.anio == anio)
     return q.all()
 
-@router.get("/tipo_credito/{pais_id}", response_model=List[schemas.CarteraAnualOut])
+@router.get("/tipo_credito/{pais_id}", response_model=List[schemas.TipoCreditoResponse])
 def get_tipo_credito_por_pais(pais_id: str, anio: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(models.TipoCredito).filter(models.TipoCredito.pais_id == pais_id)
-    if anio:
-        q = q.filter(models.TipoCredito.anio == anio)
-    return q.all()
+    sql_base = """
+        SELECT 
+            p.nombre AS pais,
+            tc.pais_id,
+            tc.anio,
+            tc.fuente,
+            tc.categoria,
+            tc.tipo_productor,
+            tc.n_operaciones,
+            tc.valor_miles_usd,
+            tc.notas
+        FROM tipo_credito tc
+        JOIN paises p ON p.pais_id = tc.pais_id
+        WHERE tc.pais_id = :pais_id
+    """
+
+    params = {"pais_id": pais_id}
+
+    if anio is not None:
+        sql_base += " AND tc.anio = :anio"
+        params["anio"] = anio
+
+    sql_base += " ORDER BY tc.anio, tc.categoria, tc.tipo_productor"
+
+    result = db.execute(text(sql_base), params).mappings().all()
+    return result
 
 # ---------------------------
 # Nuevos endpoints que requiere el frontend (modo API)
@@ -37,12 +59,9 @@ def get_tipo_credito_por_pais(pais_id: str, anio: Optional[int] = None, db: Sess
 
 @router.get("/findex", response_model=List[schemas.FindexResponse])
 def get_findex(db: Session = Depends(get_db)):
-    """
-    Devuelve los datos de la vista v_findex (Global Findex enriquecido con brechas)
-    """
     sql = text("""
         SELECT 
-            p.nombre as pais,
+            p.nombre AS pais,
             f.pais_id,
             f.anio,
             f.cuenta_financiera,
@@ -66,10 +85,10 @@ def get_findex(db: Session = Depends(get_db)):
             f.pagos_agricolas_cuenta,
             f.pagos_agricolas_banco,
             f.pagos_agricolas_efectivo,
-            f.brecha_digital_credito_pp,
-            f.ratio_subsistencia_productivo,
-            f.efectivo_agricola_pct
-        FROM v_findex f
+            fn_calcular_brecha_digital_credito(f.pais_id, f.anio) AS brecha_digital_credito_pp,
+            fn_calcular_ratio_subsistencia_productivo(f.pais_id, f.anio) AS ratio_subsistencia_productivo,
+            fn_calcular_efectivo_agricola(f.pais_id, f.anio) AS efectivo_agricola_pct
+        FROM indicadores_findex f
         JOIN paises p ON p.pais_id = f.pais_id
         ORDER BY p.nombre, f.anio
     """)
@@ -99,14 +118,11 @@ def get_oferta(db: Session = Depends(get_db)):
     result = db.execute(sql).mappings().all()
     return result
 
-@router.get("/tipo_credito", response_model=List[schemas.TipoCreditoResponse])
-def get_tipo_credito_all(db: Session = Depends(get_db)):
-    """
-    Devuelve todo el desglose de tipo_credito (línea, entidad, etc.)
-    """
-    sql = text("""
+@router.get("/tipo_credito/{pais_id}", response_model=List[schemas.TipoCreditoResponse])
+def get_tipo_credito_por_pais(pais_id: str, anio: Optional[int] = None, db: Session = Depends(get_db)):
+    sql_base = """
         SELECT 
-            p.nombre as pais,
+            p.nombre AS pais,
             tc.pais_id,
             tc.anio,
             tc.fuente,
@@ -117,9 +133,18 @@ def get_tipo_credito_all(db: Session = Depends(get_db)):
             tc.notas
         FROM tipo_credito tc
         JOIN paises p ON p.pais_id = tc.pais_id
-        ORDER BY p.nombre, tc.anio, tc.categoria
-    """)
-    result = db.execute(sql).mappings().all()
+        WHERE tc.pais_id = :pais_id
+    """
+
+    params = {"pais_id": pais_id}
+
+    if anio is not None:
+        sql_base += " AND tc.anio = :anio"
+        params["anio"] = anio
+
+    sql_base += " ORDER BY tc.anio, tc.categoria"
+
+    result = db.execute(text(sql_base), params).mappings().all()
     return result
 
 @router.get("/rural_urban", response_model=List[schemas.RuralUrbanResponse])
@@ -170,6 +195,28 @@ def get_diagnosticos(db: Session = Depends(get_db)):
         FROM diagnostico_brecha d
         JOIN paises p ON p.pais_id = d.pais_id
         ORDER BY p.nombre, d.anio
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
+
+@router.get("/recomendaciones", response_model=List[schemas.RecomendacionesResponse])
+def get_recomendaciones(db: Session = Depends(get_db)):
+    """
+    Devuelve recomendaciones generadas según el diagnóstico automático y los niveles de brecha.
+    """
+    sql = text("""
+        SELECT
+            p.nombre AS pais,
+            r.pais_id,
+            r.anio,
+            r.nivel_brecha,
+            r.eje,
+            r.recomendacion,
+            r.accion,
+            r.indicador_relacionado
+        FROM recomendaciones r
+        JOIN paises p ON p.pais_id = r.pais_id
+        ORDER BY p.nombre, r.anio, r.eje
     """)
     result = db.execute(sql).mappings().all()
     return result
@@ -240,26 +287,80 @@ def get_diccionario():
 # ---------------------------
 @router.get("/finagro/departamento", response_model=List[schemas.FinagroDepartamentoOut])
 def get_finagro_departamento(anio: Optional[int] = None, tipo: Optional[str] = None, db: Session = Depends(get_db)):
-    q = db.query(models.FinagroDepartamento)
-    if anio:
-        q = q.filter(models.FinagroDepartamento.anio == anio)
+    sql_base = """
+        SELECT
+            anio,
+            departamento,
+            tipo_productor,
+            n_operaciones,
+            valor_mm_usd AS "valor_MM_usd"
+        FROM finagro_departamento
+    """
+
+    condiciones = []
+    params = {}
+
+    if anio is not None:
+        condiciones.append("anio = :anio")
+        params["anio"] = anio
+
     if tipo:
-        q = q.filter(models.FinagroDepartamento.tipo_productor == tipo)
-    return q.all()
+        condiciones.append("tipo_productor = :tipo")
+        params["tipo"] = tipo
+
+    if condiciones:
+        sql_base += " WHERE " + " AND ".join(condiciones)
+
+    sql_base += " ORDER BY anio, departamento, tipo_productor"
+
+    result = db.execute(text(sql_base), params).mappings().all()
+    return result
 
 @router.get("/finagro/cadena", response_model=List[schemas.FinagroCadenaOut])
 def get_finagro_cadena(anio: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(models.FinagroCadena)
-    if anio:
-        q = q.filter(models.FinagroCadena.anio == anio)
-    return q.all()
+    sql_base = """
+        SELECT
+            anio,
+            cadena,
+            tipo_productor,
+            n_operaciones,
+            valor_mm_usd AS "valor_MM_usd"
+        FROM finagro_cadena
+    """
+
+    params = {}
+
+    if anio is not None:
+        sql_base += " WHERE anio = :anio"
+        params["anio"] = anio
+
+    sql_base += " ORDER BY anio, cadena, tipo_productor"
+
+    result = db.execute(text(sql_base), params).mappings().all()
+    return result
 
 @router.get("/finagro/sexo", response_model=List[schemas.FinagroSexoOut])
 def get_finagro_sexo(anio: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(models.FinagroSexo)
-    if anio:
-        q = q.filter(models.FinagroSexo.anio == anio)
-    return q.all()
+    sql_base = """
+        SELECT
+            anio,
+            sexo,
+            tipo_productor,
+            n_operaciones,
+            valor_mm_usd AS "valor_MM_usd"
+        FROM finagro_sexo
+    """
+
+    params = {}
+
+    if anio is not None:
+        sql_base += " WHERE anio = :anio"
+        params["anio"] = anio
+
+    sql_base += " ORDER BY anio, sexo, tipo_productor"
+
+    result = db.execute(text(sql_base), params).mappings().all()
+    return result
 
 # ---------------------------
 # Endpoint comparativo (opcional)
