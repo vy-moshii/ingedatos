@@ -1,0 +1,1 @@
+# Por ahora vacío, se puede usar para funciones de transformación adicionales.
