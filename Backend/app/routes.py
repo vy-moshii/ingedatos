@@ -7,10 +7,13 @@ from app import models, schemas
 
 router = APIRouter()
 
+# Mapeo de código de país a nombre para uso interno
+CODIGO_A_PAIS = {"COL": "Colombia", "ECU": "Ecuador", "PRY": "Paraguay"}
+
 # ---------------------------
-# 1. Endpoints generales por país
+# Endpoints existentes (catálogos)
 # ---------------------------
-@router.get("/paises", response_model=List[schemas.PaisBase])
+@router.get("/paises", response_model=List[schemas.PaisOut])
 def get_paises(db: Session = Depends(get_db)):
     return db.query(models.Pais).all()
 
@@ -21,95 +24,219 @@ def get_cartera(pais_id: str, anio: Optional[int] = None, db: Session = Depends(
         q = q.filter(models.CarteraAnual.anio == anio)
     return q.all()
 
-@router.get("/tipo_credito/{pais_id}", response_model=List[schemas.TipoCreditoOut])
-def get_tipo_credito(pais_id: str, anio: Optional[int] = None, db: Session = Depends(get_db)):
+@router.get("/tipo_credito/{pais_id}", response_model=List[schemas.CarteraAnualOut])
+def get_tipo_credito_por_pais(pais_id: str, anio: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(models.TipoCredito).filter(models.TipoCredito.pais_id == pais_id)
     if anio:
         q = q.filter(models.TipoCredito.anio == anio)
     return q.all()
 
 # ---------------------------
-# 2. Endpoints de Findex (incluye brecha calculada)
+# Nuevos endpoints que requiere el frontend (modo API)
 # ---------------------------
-@router.get("/findex/{pais_id}", response_model=List[schemas.FindexOut])
-def get_findex(pais_id: str, anio: Optional[int] = None, db: Session = Depends(get_db)):
-    # Usamos la vista v_findex definida en el script SQL
+
+@router.get("/findex", response_model=List[schemas.FindexResponse])
+def get_findex(db: Session = Depends(get_db)):
+    """
+    Devuelve los datos de la vista v_findex (Global Findex enriquecido con brechas)
+    """
     sql = text("""
-        SELECT pais_id, anio, cuenta_digital, prestamo_banco_formal,
-               brecha_digital_credito_pp, ratio_subsistencia_productivo
-        FROM v_findex
-        WHERE pais_id = :pais_id
-        {filtro_anio}
-        ORDER BY anio
-    """.format(filtro_anio = "AND anio = :anio" if anio else ""))
-    params = {"pais_id": pais_id}
-    if anio:
-        params["anio"] = anio
-    result = db.execute(sql, params).mappings().all()
+        SELECT 
+            p.nombre as pais,
+            f.pais_id,
+            f.anio,
+            f.cuenta_financiera,
+            f.cuenta_banco_formal,
+            f.cuenta_dinero_movil,
+            f.cuenta_digital,
+            f.cuenta_inactiva,
+            f.pago_digital,
+            f.ahorro_formal_movil,
+            f.smartphone,
+            f.internet,
+            f.movil_info_agricola,
+            f.prestamo_cualquier_fuente,
+            f.prestamo_banco_formal,
+            f.prestamo_proveedor_movil,
+            f.prestamo_familia_amigos,
+            f.prestamo_negocio,
+            f.credito_subsistencia,
+            f.prestamo_recibido_movil,
+            f.pagos_agricolas_total,
+            f.pagos_agricolas_cuenta,
+            f.pagos_agricolas_banco,
+            f.pagos_agricolas_efectivo,
+            f.brecha_digital_credito_pp,
+            f.ratio_subsistencia_productivo,
+            f.efectivo_agricola_pct
+        FROM v_findex f
+        JOIN paises p ON p.pais_id = f.pais_id
+        ORDER BY p.nombre, f.anio
+    """)
+    result = db.execute(sql).mappings().all()
     return result
 
-# ---------------------------
-# 3. Endpoints de diagnóstico (usando tabla diagnostico_brecha)
-# ---------------------------
-@router.get("/diagnostico/{pais_id}", response_model=schemas.DiagnosticoOut)
-def get_diagnostico(pais_id: str, anio: int, db: Session = Depends(get_db)):
-    # Primero intentamos obtener de la tabla
-    diag = db.query(models.DiagnosticoBrecha).filter(
-        models.DiagnosticoBrecha.pais_id == pais_id,
-        models.DiagnosticoBrecha.anio == anio
-    ).first()
-    if not diag:
-        # Si no existe, llamamos a la función PL/pgSQL que lo genera
-        sql = text("SELECT * FROM fn_generar_diagnostico_brecha(:pais_id, :anio)")
-        result = db.execute(sql, {"pais_id": pais_id, "anio": anio}).mappings().first()
-        if not result:
-            raise HTTPException(404, "No se pudo generar diagnóstico")
-        # Guardamos en la tabla (el trigger lo haría, pero lo hacemos explícito)
-        nuevo = models.DiagnosticoBrecha(
-            pais_id=pais_id,
-            anio=anio,
-            nivel_brecha=result["nivel"],
-            puntaje_brecha=result["puntaje"],
-            texto_diagnostico=result["diagnostico"]
-        )
-        db.add(nuevo)
-        db.commit()
-        db.refresh(nuevo)
-        diag = nuevo
-    # Obtener ejes de recomendación
-    ejes = db.query(models.Recomendaciones.eje).filter(
-        models.Recomendaciones.pais_id == pais_id,
-        models.Recomendaciones.anio == anio,
-        models.Recomendaciones.nivel_brecha == diag.nivel_brecha
-    ).distinct().all()
-    ejes_str = " | ".join([e[0] for e in ejes]) if ejes else None
-    return schemas.DiagnosticoOut(
-        pais_id=diag.pais_id,
-        anio=diag.anio,
-        nivel_brecha=diag.nivel_brecha,
-        puntaje_brecha=diag.puntaje_brecha,
-        texto_diagnostico=diag.texto_diagnostico,
-        ejes_recomendacion=ejes_str
-    )
+@router.get("/oferta", response_model=List[schemas.OfertaResponse])
+def get_oferta(db: Session = Depends(get_db)):
+    """
+    Devuelve la cartera anual (cartera_anual) para todos los países
+    """
+    sql = text("""
+        SELECT 
+            p.nombre as pais,
+            c.pais_id,
+            c.anio,
+            c.fuente,
+            c.tipo_productor,
+            c.n_operaciones,
+            c.valor_miles_usd,
+            c.moneda_original,
+            c.notas
+        FROM cartera_anual c
+        JOIN paises p ON p.pais_id = c.pais_id
+        ORDER BY p.nombre, c.anio, c.tipo_productor
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
 
-@router.get("/recomendaciones/{pais_id}", response_model=List[schemas.RecomendacionOut])
-def get_recomendaciones(pais_id: str, anio: int, db: Session = Depends(get_db)):
-    # Primero obtenemos el nivel de brecha para ese año
-    diag = db.query(models.DiagnosticoBrecha).filter(
-        models.DiagnosticoBrecha.pais_id == pais_id,
-        models.DiagnosticoBrecha.anio == anio
-    ).first()
-    if not diag:
-        raise HTTPException(404, "Diagnóstico no encontrado")
-    recs = db.query(models.Recomendaciones).filter(
-        models.Recomendaciones.pais_id == pais_id,
-        models.Recomendaciones.anio == anio,
-        models.Recomendaciones.nivel_brecha == diag.nivel_brecha
-    ).all()
-    return recs
+@router.get("/tipo_credito", response_model=List[schemas.TipoCreditoResponse])
+def get_tipo_credito_all(db: Session = Depends(get_db)):
+    """
+    Devuelve todo el desglose de tipo_credito (línea, entidad, etc.)
+    """
+    sql = text("""
+        SELECT 
+            p.nombre as pais,
+            tc.pais_id,
+            tc.anio,
+            tc.fuente,
+            tc.categoria,
+            tc.tipo_productor,
+            tc.n_operaciones,
+            tc.valor_miles_usd,
+            tc.notas
+        FROM tipo_credito tc
+        JOIN paises p ON p.pais_id = tc.pais_id
+        ORDER BY p.nombre, tc.anio, tc.categoria
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
+
+@router.get("/rural_urban", response_model=List[schemas.RuralUrbanResponse])
+def get_rural_urban(db: Session = Depends(get_db)):
+    """
+    Devuelve indicadores rural/urbano desde la tabla indicadores_rural_urbano
+    """
+    sql = text("""
+        SELECT 
+            p.nombre as pais,
+            ru.pais_id,
+            ru.anio,
+            ru.zona,
+            ru.cuenta_financiera,
+            ru.cuenta_digital,
+            ru.prestamo_banco_formal,
+            ru.credito_subsistencia,
+            ru.smartphone,
+            ru.internet,
+            ru.barrera_costo,
+            ru.barrera_fondos,
+            ru.barrera_distancia,
+            ru.dificultad_emergencia
+        FROM indicadores_rural_urbano ru
+        JOIN paises p ON p.pais_id = ru.pais_id
+        ORDER BY p.nombre, ru.anio, ru.zona
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
+
+@router.get("/diagnosticos", response_model=List[schemas.DiagnosticoResponse])
+def get_diagnosticos(db: Session = Depends(get_db)):
+    """
+    Devuelve la tabla diagnostico_brecha con el nivel de brecha por país y año
+    """
+    sql = text("""
+        SELECT 
+            p.nombre as pais,
+            d.pais_id,
+            d.anio,
+            d.nivel_brecha,
+            d.puntaje_brecha,
+            d.brecha_digital_credito_pp,
+            d.cambio_credito_formal_pp,
+            d.ratio_subsistencia_productivo,
+            d.efectivo_agricola_pct,
+            d.texto_diagnostico
+        FROM diagnostico_brecha d
+        JOIN paises p ON p.pais_id = d.pais_id
+        ORDER BY p.nombre, d.anio
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
+
+@router.get("/missing", response_model=List[schemas.MissingDataResponse])
+def get_missing_data(db: Session = Depends(get_db)):
+    """
+    Devuelve los datos faltantes registrados en la tabla datos_faltantes
+    """
+    sql = text("""
+        SELECT 
+            COALESCE(p.nombre, 'Todos los países') as pais,
+            df.fuente,
+            df.dato_faltante,
+            df.prioridad,
+            df.justificacion as por_que_importa
+        FROM datos_faltantes df
+        LEFT JOIN paises p ON p.pais_id = df.pais_id
+        ORDER BY df.prioridad, df.pais_id NULLS LAST
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
+
+@router.get("/fuentes", response_model=List[schemas.FuenteResponse])
+def get_fuentes(db: Session = Depends(get_db)):
+    """
+    Devuelve las fuentes de datos desde la tabla metadatos,
+    formateadas como espera el frontend.
+    """
+    sql = text("""
+        SELECT 
+            m.fuente,
+            p.nombre as pais,
+            m.anios_cubiertos as periodo,
+            m.observaciones as uso,
+            'Disponible' as estado
+        FROM metadatos m
+        JOIN paises p ON p.pais_id = m.pais_id
+        ORDER BY p.nombre, m.fuente
+    """)
+    result = db.execute(sql).mappings().all()
+    return result
+
+@router.get("/diccionario", response_model=List[schemas.DiccionarioResponse])
+def get_diccionario():
+    """
+    Diccionario estático de indicadores Global Findex
+    (coincide con el que usa el frontend en modo mock)
+    """
+    data = [
+        {"grupo": "Inclusión transaccional", "indicador": "Cuenta financiera", "codigo": "account.t.d", "descripcion": "% adultos con cuenta en institución financiera o móvil"},
+        {"grupo": "Inclusión transaccional", "indicador": "Cuenta banco formal", "codigo": "fin11a.t.d", "descripcion": "% adultos con cuenta en banco formal"},
+        {"grupo": "Inclusión transaccional", "indicador": "Cuenta dinero móvil", "codigo": "mob.t.d", "descripcion": "% adultos con cuenta de dinero móvil"},
+        {"grupo": "Inclusión transaccional", "indicador": "Cuenta habilitada digitalmente", "codigo": "dig.acc", "descripcion": "% adultos con cuenta digital activa"},
+        {"grupo": "Digitalización", "indicador": "Pago digital", "codigo": "g20.any", "descripcion": "% realizó o recibió algún pago digital"},
+        {"grupo": "Digitalización", "indicador": "Usó internet", "codigo": "internet", "descripcion": "% usó internet en los últimos 3 meses"},
+        {"grupo": "Crédito", "indicador": "Préstamo banco formal", "codigo": "fin22a", "descripcion": "% adultos con préstamo vigente en banco formal"},
+        {"grupo": "Crédito", "indicador": "Préstamo para negocio", "codigo": "fin22e", "descripcion": "% adultos cuyo último préstamo fue para negocio o actividad productiva"},
+        {"grupo": "Crédito", "indicador": "Crédito de subsistencia", "codigo": "fin22f", "descripcion": "% adultos que compraron alimentos a crédito"},
+        {"grupo": "Crédito", "indicador": "Pagos agrícolas en efectivo", "codigo": "fin43c", "descripcion": "% adultos que reciben pagos agrícolas exclusivamente en efectivo"},
+        {"grupo": "Barreras", "indicador": "Banco muy lejos", "codigo": "fin11d", "descripcion": "% adultos sin cuenta que señalan distancia al banco"},
+        {"grupo": "Resiliencia", "indicador": "Dificultad alta ante emergencia", "codigo": "fin24aVD", "descripcion": "% adultos con mucha dificultad para reunir fondos de emergencia"}
+    ]
+    return [schemas.DiccionarioResponse(**item) for item in data]
 
 # ---------------------------
-# 4. Endpoints de microdatos FINAGRO (Colombia)
+# Endpoints de microdatos FINAGRO (opcionales, si el frontend los usa)
 # ---------------------------
 @router.get("/finagro/departamento", response_model=List[schemas.FinagroDepartamentoOut])
 def get_finagro_departamento(anio: Optional[int] = None, tipo: Optional[str] = None, db: Session = Depends(get_db)):
@@ -135,15 +262,10 @@ def get_finagro_sexo(anio: Optional[int] = None, db: Session = Depends(get_db)):
     return q.all()
 
 # ---------------------------
-# 5. Endpoint comparativo entre países
+# Endpoint comparativo (opcional)
 # ---------------------------
 @router.get("/comparativo/{indicador}", response_model=List[schemas.ComparativoItem])
 def get_comparativo(indicador: str, anios: Optional[str] = None, db: Session = Depends(get_db)):
-    """
-    indicador puede ser: 'prestamo_banco_formal', 'cuenta_digital', 'pagos_agricolas_efectivo'
-    anios: separados por coma, ej. '2021,2024'
-    """
-    # Mapeo de indicador a columna
     col_map = {
         "prestamo_banco_formal": models.IndicadoresFindex.prestamo_banco_formal,
         "cuenta_digital": models.IndicadoresFindex.cuenta_digital,
@@ -166,12 +288,3 @@ def get_comparativo(indicador: str, anios: Optional[str] = None, db: Session = D
     
     results = q.all()
     return [schemas.ComparativoItem(pais=r.pais, anio=r.anio, indicador=indicador, valor=r.valor) for r in results]
-
-# ---------------------------
-# 6. Endpoint de datos faltantes
-# ---------------------------
-@router.get("/datos_faltantes", response_model=List[schemas.DatosFaltantes])
-def get_datos_faltantes(db: Session = Depends(get_db)):
-    return db.query(models.DatosFaltantes).all()
-
-# Nota: Falta crear el esquema DatosFaltantes en schemas, similar a los demás.
